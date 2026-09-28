@@ -52,7 +52,7 @@ export function Sidebar({
     <aside className="flex h-screen w-[270px] shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-5">
       <div className="mb-7 px-2">
         <div className="text-[29px] font-black tracking-[-0.09em] text-black">
-          OUTBOX
+          ReachBox
         </div>
       </div>
 
