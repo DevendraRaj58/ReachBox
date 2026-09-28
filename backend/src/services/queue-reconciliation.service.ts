@@ -4,7 +4,6 @@ import { emailQueue } from '../queues/email.queue.js';
 export async function reconcileEmailQueue() {
   const pendingEmails = await prisma.email.findMany({
     where: {
-      dispatchStatus: 'PENDING',
       status: 'SCHEDULED',
     },
     orderBy: {
@@ -18,10 +17,16 @@ export async function reconcileEmailQueue() {
   }
 
   console.log(
-    `Queue reconciliation: recovering ${pendingEmails.length} email(s).`
+    `Queue reconciliation: checking ${pendingEmails.length} scheduled email(s).`
   );
 
   for (const email of pendingEmails) {
+    const existingJob = await emailQueue.getJob(email.bullJobId);
+
+    if (existingJob) {
+      continue;
+    }
+
     const delay = Math.max(
       0,
       email.scheduledAt.getTime() - Date.now()
@@ -46,6 +51,10 @@ export async function reconcileEmailQueue() {
         dispatchStatus: 'QUEUED',
       },
     });
+
+    console.log(
+      `Queue reconciliation: restored email ${email.id}.`
+    );
   }
 
   console.log('Queue reconciliation completed.');

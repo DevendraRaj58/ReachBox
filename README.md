@@ -552,13 +552,13 @@ The assignment does not require delivering thousands of messages through Etherea
 
 # Persistence and Restart Handling
 
-Future schedules are persisted in PostgreSQL and delayed BullMQ jobs are stored in Redis.
+Future schedules are persisted in PostgreSQL, while BullMQ delayed jobs are stored in Redis.
 
-The API process therefore does not need to keep the schedule in memory.
+The API process does not need to keep future schedules only in memory.
 
-At backend startup, the queue reconciliation service checks scheduled email records that are still pending dispatch.
+When the backend starts, the queue reconciliation service checks emails that are still in the `SCHEDULED` state. For each scheduled email, it checks whether the corresponding BullMQ job already exists using its deterministic job ID.
 
-If an email was successfully persisted in PostgreSQL but its BullMQ job was not created, reconciliation can recreate the expected job using its deterministic job id.
+If the BullMQ job is missing, the reconciliation service recreates the delayed job using the original scheduled time. If the job already exists, it is left unchanged to avoid creating duplicate jobs.
 
 Restart flow:
 
@@ -578,13 +578,17 @@ Backend restarts
 Queue reconciliation
         |
         v
-Restore missing job if required
+Check whether BullMQ job exists
         |
-        v
-Worker processes future email
-```
-
-This protects against the database to queue creation gap and prevents future scheduled work from depending only on the lifetime of the Node.js process.
+        +---- Exists ----> Leave job unchanged
+        |
+        +---- Missing ---> Recreate delayed job
+                                |
+                                v
+                         Worker processes email
+                                |
+                                v
+                           Email sent
 
 # Idempotency
 
