@@ -1,0 +1,114 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EmailStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum EmailDispatchStatus {
+  PENDING
+  QUEUED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  googleId  String   @unique
+  email     String   @unique
+  name      String
+  avatarUrl String?
+
+  emails          Email[]
+  scheduleBatches ScheduleBatch[] // <-- ADDED THIS LINE
+  slackConnection SlackConnection?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScheduleBatch {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subject     String
+  body        String
+  startTime   DateTime
+  delayMs     Int
+  hourlyLimit Int
+
+  totalEmails Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emails Email[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Email {
+  id String @id @default(cuid())
+
+  batchId String
+  batch   ScheduleBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  recipient String
+  subject   String
+  body      String
+
+  senderId      String
+  senderAddress String
+
+  scheduledAt DateTime
+
+  sentAt   DateTime?
+  failedAt DateTime?
+
+  status EmailStatus @default(SCHEDULED)
+
+  dispatchStatus EmailDispatchStatus @default(PENDING)
+
+  bullJobId String @unique
+
+  attempts  Int     @default(0)
+  lastError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, scheduledAt])
+  @@index([userId, sentAt])
+  @@index([batchId])
+  @@index([senderId, scheduledAt])
+  @@index([recipient])
+}
+
+model SlackConnection {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  slackUserId String?
+
+  accessToken String
+  webhookUrl  String?
+
+  connectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
